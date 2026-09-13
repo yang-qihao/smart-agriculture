@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Kafka -> Spark Structured Streaming -> HDFS
-从 Windows Kafka 消费传感器数据, 5 秒窗口聚合温度,
+从 Windows Kafka 消费传感器数据, 5 秒窗口聚合 温度/湿度/土壤湿度/光照 四项指标,
 结果以 csv 追加写入 HDFS /user/atguigu/sensor_out (供 Flask 大屏读取)"""
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, window, avg, max, min, to_timestamp
@@ -39,23 +39,27 @@ parsed_df = parsed_df.withColumn(
     "event_time", to_timestamp(col("time_stamp"), "yyyyMMdd-HHmmss")
 ).withWatermark("event_time", "1 seconds")
 
-# 5. 5 秒窗口聚合
+# 5. 5 秒窗口聚合 (四项指标)
 aggregated_df = (
     parsed_df
     .groupBy(window(col("event_time"), "5 seconds"))
     .agg(
         avg("tem").alias("avg_temp"),
         max("tem").alias("max_temp"),
-        min("tem").alias("min_temp")
+        min("tem").alias("min_temp"),
+        avg("hum").alias("avg_hum"),
+        avg("soil_hum").alias("avg_soil"),
+        avg("light_inten").alias("avg_light")
     )
     .select(
         col("window.start").alias("window_start"),
         col("window.end").alias("window_end"),
-        "avg_temp", "max_temp", "min_temp"
+        "avg_temp", "max_temp", "min_temp",
+        "avg_hum", "avg_soil", "avg_light"
     )
 )
 
-# 6. 双输出: 控制台打印 + 追加写 HDFS (csv 无 schema 文件, Flask 好读)
+# 6. 双输出: 追加写 HDFS (csv) + 控制台打印
 query = (
     aggregated_df.writeStream
     .outputMode("append")   # csv 落盘只支持 append

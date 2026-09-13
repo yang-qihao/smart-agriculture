@@ -120,10 +120,11 @@ body {
 .card-range .max { color: #f56c6c; }
 
 /* Chart area */
-.chart-row {
+.chart-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
+  margin-bottom: 20px;
 }
 .chart-card {
   background: linear-gradient(135deg, #1a2a4a 0%, #0d1b3a 100%);
@@ -136,13 +137,18 @@ body {
   margin-bottom: 16px;
   color: #e8f1ff;
 }
-#trend-chart {
+.trend-chart {
   width: 100%;
-  height: 300px;
+  height: 240px;
+}
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
 }
 #alert-list {
   list-style: none;
-  max-height: 300px;
+  max-height: 200px;
   overflow-y: auto;
 }
 #alert-list li {
@@ -161,7 +167,7 @@ body {
 /* Responsive */
 @media (max-width: 1200px) {
   .grid { grid-template-columns: repeat(2, 1fr); }
-  .chart-row { grid-template-columns: 1fr; }
+  .chart-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -222,11 +228,26 @@ body {
   </div>
 </div>
 
-<div class="chart-row">
+<div class="chart-grid">
   <div class="chart-card">
-    <h3>📈 温度趋势 (近10个窗口)</h3>
-    <div id="trend-chart"></div>
+    <h3>🌡️ 温度趋势 (近10个窗口)</h3>
+    <div class="trend-chart" id="chart-temp"></div>
   </div>
+  <div class="chart-card">
+    <h3>💧 湿度趋势 (近10个窗口)</h3>
+    <div class="trend-chart" id="chart-hum"></div>
+  </div>
+  <div class="chart-card">
+    <h3>🌱 土壤湿度趋势 (近10个窗口)</h3>
+    <div class="trend-chart" id="chart-soil"></div>
+  </div>
+  <div class="chart-card">
+    <h3>☀️ 光照强度趋势 (近10个窗口)</h3>
+    <div class="trend-chart" id="chart-light"></div>
+  </div>
+</div>
+
+<div class="chart-row">
   <div class="chart-card">
     <h3>⚠️ 实时告警</h3>
     <ul id="alert-list">
@@ -236,48 +257,61 @@ body {
 </div>
 
 <script>
-// ECharts init
-const chart = echarts.init(document.getElementById('trend-chart'));
-const chartOption = {
-  backgroundColor: 'transparent',
-  tooltip: { trigger: 'axis' },
-  grid: { left: '8%', right: '4%', top: '10%', bottom: '15%' },
-  xAxis: {
-    type: 'category',
-    data: [],
-    axisLine: { lineStyle: { color: '#4a5568' } },
-    axisLabel: { color: '#a8b2c8', fontSize: 11 },
-  },
-  yAxis: {
-    type: 'value',
-    name: '温度 (°C)',
-    nameTextStyle: { color: '#a8b2c8' },
-    axisLine: { lineStyle: { color: '#4a5568' } },
-    axisLabel: { color: '#a8b2c8' },
-    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } },
-  },
-  series: [
-    {
-      name: '平均温度',
+// ---------- 四个趋势图 (不同颜色) ----------
+function makeChart(domId, name, unit, color) {
+  const c = echarts.init(document.getElementById(domId));
+  c.setOption({
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'axis' },
+    grid: { left: '12%', right: '5%', top: '12%', bottom: '18%' },
+    xAxis: {
+      type: 'category',
+      data: [],
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#a8b2c8', fontSize: 10, rotate: 30 },
+    },
+    yAxis: {
+      type: 'value',
+      name: unit,
+      nameTextStyle: { color: '#a8b2c8' },
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#a8b2c8' },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } },
+      scale: true,
+    },
+    series: [{
+      name: name,
       type: 'line',
       smooth: true,
       data: [],
-      lineStyle: { width: 3, color: '#f56c6c' },
+      lineStyle: { width: 3, color: color },
       areaStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
-          { offset: 1, color: 'rgba(245, 108, 108, 0.05)' },
+          { offset: 0, color: color + '66' },
+          { offset: 1, color: color + '0d' },
         ]),
       },
-      itemStyle: { color: '#f56c6c' },
-    },
-  ],
-};
-chart.setOption(chartOption);
+      itemStyle: { color: color },
+    }],
+  });
+  return c;
+}
 
-// History buffer
+const chartTemp  = makeChart('chart-temp',  '平均温度',   '°C',  '#f56c6c'); // 红
+const chartHum   = makeChart('chart-hum',   '平均湿度',   '%',   '#409eff'); // 蓝
+const chartSoil  = makeChart('chart-soil',  '平均土壤湿度', '%', '#67c23a'); // 绿
+const chartLight = makeChart('chart-light', '平均光照',   'lux', '#e6a23c'); // 橙
+
+// History buffer (四项共用时间轴)
 const history = [];
 const MAX_POINTS = 10;
+
+function pushChart(chart, values) {
+  chart.setOption({
+    xAxis: { data: history.map(h => h.time) },
+    series: [{ data: values }],
+  });
+}
 
 // Poll
 async function refresh() {
@@ -288,21 +322,28 @@ async function refresh() {
       document.getElementById('avg-temp').textContent = data.avg_temp.toFixed(1);
       document.getElementById('min-temp').textContent = data.min_temp.toFixed(1);
       document.getElementById('max-temp').textContent = data.max_temp.toFixed(1);
-      // Mock other sensors (real pipeline only has temp for now)
-      document.getElementById('avg-humid').textContent = (55 + Math.random() * 10).toFixed(1);
-      document.getElementById('light').textContent = Math.round(3000 + Math.random() * 1500);
-      document.getElementById('soil').textContent = (45 + Math.random() * 8).toFixed(1);
-      document.getElementById('min-humid').textContent = '42.3';
-      document.getElementById('max-humid').textContent = '68.7';
 
-      // Update chart
+      // 湿度/土壤/光照: 用 Spark 真实聚合值, 旧格式没有时显示 --
+      const hasAll = data.avg_hum !== undefined;
+      document.getElementById('avg-humid').textContent = hasAll ? data.avg_hum.toFixed(1) : '--';
+      document.getElementById('soil').textContent      = hasAll ? data.avg_soil.toFixed(1) : '--';
+      document.getElementById('light').textContent     = hasAll ? Math.round(data.avg_light) : '--';
+
+      // Update charts
       const time = new Date(data.window_end).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      history.push({ time, temp: data.avg_temp });
-      if (history.length > MAX_POINTS) history.shift();
-      chart.setOption({
-        xAxis: { data: history.map(h => h.time) },
-        series: [{ data: history.map(h => h.temp) }],
+      history.push({
+        time,
+        temp: +data.avg_temp.toFixed(2),
+        hum: hasAll ? +data.avg_hum.toFixed(2) : null,
+        soil: hasAll ? +data.avg_soil.toFixed(2) : null,
+        light: hasAll ? +data.avg_light.toFixed(0) : null,
       });
+      if (history.length > MAX_POINTS) history.shift();
+
+      pushChart(chartTemp,  history.map(h => h.temp));
+      pushChart(chartHum,   history.map(h => h.hum));
+      pushChart(chartSoil,  history.map(h => h.soil));
+      pushChart(chartLight, history.map(h => h.light));
 
       // Update alerts
       const alerts = document.getElementById('alert-list');
@@ -311,7 +352,12 @@ async function refresh() {
         alerts.innerHTML += '<li>⚠️ 温度过高 (' + data.avg_temp.toFixed(1) + '°C),建议开启通风</li>';
       } else if (data.avg_temp < 15) {
         alerts.innerHTML += '<li>⚠️ 温度过低 (' + data.avg_temp.toFixed(1) + '°C),建议保温</li>';
-      } else {
+      }
+      if (hasAll) {
+        if (data.avg_hum > 85) alerts.innerHTML += '<li>⚠️ 湿度过高 (' + data.avg_hum.toFixed(1) + '%),注意病害风险</li>';
+        if (data.avg_soil < 30) alerts.innerHTML += '<li>⚠️ 土壤偏干 (' + data.avg_soil.toFixed(1) + '%),建议灌溉</li>';
+      }
+      if (!alerts.innerHTML) {
         alerts.innerHTML += '<li class="info">✅ 当前环境正常,无告警</li>';
       }
       alerts.innerHTML += '<li class="info">💡 最近窗口: ' + time + '</li>';
@@ -325,7 +371,9 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, 2000);
-window.addEventListener('resize', () => chart.resize());
+window.addEventListener('resize', () => {
+  chartTemp.resize(); chartHum.resize(); chartSoil.resize(); chartLight.resize();
+});
 </script>
 
 </body>

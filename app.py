@@ -41,14 +41,20 @@ def hdfs_read_text(path):
 
 
 def parse_line(line):
-    # Spark csv 输出: window_start,window_end,avg_temp,max_temp,min_temp
+    # Spark csv 输出: window_start,window_end,avg_temp,max_temp,min_temp,avg_hum,avg_soil,avg_light
+    # (兼容旧 5 列格式: 只有温度)
     p = line.strip().split(",")
     if len(p) < 5:
         return None
     try:
-        return {"window_start": p[0], "window_end": p[1],
-                "avg_temp": float(p[2]), "max_temp": float(p[3]),
-                "min_temp": float(p[4])}
+        rec = {"window_start": p[0], "window_end": p[1],
+               "avg_temp": float(p[2]), "max_temp": float(p[3]),
+               "min_temp": float(p[4])}
+        if len(p) >= 8:
+            rec["avg_hum"] = float(p[5])
+            rec["avg_soil"] = float(p[6])
+            rec["avg_light"] = float(p[7])
+        return rec
     except (ValueError, IndexError):
         return None
 
