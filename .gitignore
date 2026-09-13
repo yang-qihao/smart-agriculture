@@ -1,0 +1,17 @@
+# === Word 文档（不提交）===
+*.doc
+*.docx
+
+# === PyCharm/IDE 配置 ===
+.idea/
+
+# === Python 缓存 ===
+__pycache__/
+*.pyc
+
+# === 虚拟环境 ===
+.venv/
+venv/
+
+# === 密钥 ===
+.env

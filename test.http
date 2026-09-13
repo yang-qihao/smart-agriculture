@@ -1,0 +1,91 @@
+@demoHost  = http://localhost:5001
+@basicHost = http://localhost:5002
+@appHost   = http://localhost:5000
+
+
+### 打开实时页面（Socket.IO 推送效果：数值每 2 秒自动跳动）
+GET {{demoHost}}/
+Accept: text/html
+
+### REST 主动拉取（和推送拿的是同一份数据，用来体会「拉」和「推」的区别）
+GET {{demoHost}}/api/latest
+Accept: application/json
+
+### 健康检查：has_data=false 说明后台线程还没采到第一批数据
+GET {{demoHost}}/api/health
+Accept: application/json
+
+
+
+
+### 打开演示页面：页面上的操作都会真实调用下面的接口
+GET {{basicHost}}/
+Accept: text/html
+
+### 1 基础路由
+GET {{basicHost}}/hello
+
+### 2 HTTP 方法：POST 改成 PUT / DELETE 都能试
+POST {{basicHost}}/methods
+
+### 3 路径参数：字符串
+GET {{basicHost}}/user/张三
+
+### 4 路径参数：int 转换器（把 7 换成 abc 会直接 404）
+GET {{basicHost}}/item/7
+
+### 5 查询参数：默认值、类型转换、同名多值
+GET {{basicHost}}/search?q=温度&page=2&tag=a&tag=b
+
+### 6 JSON 请求体
+POST {{basicHost}}/json
+Content-Type: application/json
+
+{"name": "张三", "age": 20}
+
+### 7 表单请求体
+POST {{basicHost}}/form
+Content-Type: application/x-www-form-urlencoded
+
+name=张三&age=20
+
+### 8 Session 登录：响应会带 Set-Cookie，客户端要保存 Cookie
+POST {{basicHost}}/login
+Content-Type: application/x-www-form-urlencoded
+
+user=张三
+
+### 9 Session 读取（依赖上一步的 Cookie）
+GET {{basicHost}}/me
+
+### 10 Session 清空
+GET {{basicHost}}/logout
+
+### 11 自定义 404：返回 JSON 而不是 HTML 错误页
+GET {{basicHost}}/not-exist
+
+
+### ---------- 三、实战项目 app.py ----------
+
+### 实时监控大屏
+GET {{appHost}}/
+Accept: text/html
+
+### 最近一次推送的聚合结果（path 为 HDFS 上的文件名）
+GET {{appHost}}/api/latest
+Accept: application/json
+
+### HDFS 链路状态：online=正常出数 / waiting=目录暂无文件 / error=请求失败
+GET {{appHost}}/api/health
+Accept: application/json
+
+
+### ---------- 四、Socket.IO 推送怎么测 ----------
+### HTTP 只能测「一问一答」，测不到服务端主动推送。验证方式：
+###   a) 浏览器打开页面，观察数值是否自动刷新
+###   b) F12 打开控制台粘贴：
+###        var s = io('http://localhost:5001');
+###        s.on('sensor_update', d => console.log('收到推送', d));
+###   c) 原生 WebSocket 观察帧（仅 JetBrains HTTP Client 支持）。Socket.IO 外面套了
+###      Engine.IO 协议，连上先收到 0{"sid":"..."} 属正常，进默认命名空间需回发 "40"
+WEBSOCKET ws://localhost:5001/socket.io/?EIO=4&transport=websocket

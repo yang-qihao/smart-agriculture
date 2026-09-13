@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Flask 基础演示</title>
+<style>
+  body { font-family: "Microsoft YaHei", sans-serif; max-width: 860px; margin: 30px auto; padding: 0 16px; background:#fafafa; }
+  h1 { font-size: 22px; }
+  .card { background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:12px 16px; margin:10px 0; }
+  button { padding:6px 14px; margin-right:8px; border:1px solid #888; border-radius:5px; background:#fff; cursor:pointer; }
+  button:hover { background:#eee; }
+  pre { background:#111; color:#7ec69a; padding:10px; border-radius:6px; min-height:20px; white-space:pre-wrap; word-break:break-all; }
+  input { padding:5px; border:1px solid #ccc; border-radius:4px; width:120px; }
+</style>
+</head>
+<body>
+<h1>Flask 基础演示页面</h1>
+<p>点击按钮会真实调用后端接口，结果显示在黑色框里。</p>
+
+<div class="card"><b>1. 基础路由 GET /hello</b><br><br>
+  <button onclick="call('/hello')">请求</button>
+  <pre id="r1">（未请求）</pre></div>
+
+<div class="card"><b>2. HTTP 方法 POST /methods</b><br><br>
+  <button onclick="call('/methods','POST')">POST</button>
+  <button onclick="call('/methods','PUT')">PUT</button>
+  <button onclick="call('/methods','DELETE')">DELETE</button>
+  <pre id="r2">（未请求）</pre></div>
+
+<div class="card"><b>3. 路径参数 /user/&lt;name&gt; 和 /item/&lt;int:id&gt;</b><br><br>
+  名字 <input id="uname" value="张三">
+  <button onclick="call('/user/'+encodeURIComponent(document.getElementById('uname').value))">查用户</button>
+  &nbsp;&nbsp;编号 <input id="iid" value="7">
+  <button onclick="call('/item/'+document.getElementById('iid').value)">查物品</button>
+  <pre id="r3">（未请求）</pre></div>
+
+<div class="card"><b>4. 查询参数 /search?q=…&amp;page=…&amp;tag=…</b><br><br>
+  <button onclick="call('/search?q=温度&page=2&tag=a&tag=b')">带默认/多值请求</button>
+  <pre id="r4">（未请求）</pre></div>
+
+<div class="card"><b>5. JSON 请求体 POST /json</b><br><br>
+  <button onclick="call('/json','POST',{name:'张三',age:20})">发送 JSON</button>
+  <pre id="r5">（未请求）</pre></div>
+
+<div class="card"><b>6. 表单请求体 POST /form</b><br><br>
+  <button onclick="call('/form','POST',new URLSearchParams({name:'张三',age:'20'}))">发送表单</button>
+  <pre id="r6">（未请求）</pre></div>
+
+<div class="card"><b>7. Session 登录 → 读取 → 退出</b><br><br>
+  <button onclick="call('/login','POST',new URLSearchParams({user:'张三'}), document.getElementById('r7'))">登录</button>
+  <button onclick="call('/me', 'GET', null, document.getElementById('r7'))">我是谁(/me)</button>
+  <button onclick="call('/logout','GET',null,document.getElementById('r7'))">退出</button>
+  <pre id="r7">（未请求）</pre></div>
+
+<div class="card"><b>8. 自定义 404（JSON 返回）</b><br><br>
+  <button onclick="call('/not-exist')">请求不存在的路径</button>
+  <pre id="r8">（未请求）</pre></div>
+
+<script>
+async function call(url, method='GET', body=null, out=null) {
+  const target = out || document.getElementById('r' + url.replace(/[^0-9]/g,'').slice(0,1) || '1');
+  const opts = { method };
+  if (body instanceof URLSearchParams) {
+    opts.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    opts.body = body.toString();
+  } else if (body) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(body);
+  }
+  try {
+    const res = await fetch(url, opts);
+    const text = await res.text();
+    let pretty = text;
+    try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch(e) {}
+    target.textContent = `${res.status} ${res.statusText}\n${pretty}`;
+  } catch (e) {
+    target.textContent = '请求失败: ' + e;
+  }
+}
+</script>
+</body>
+</html>
